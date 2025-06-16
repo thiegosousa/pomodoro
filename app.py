@@ -9,46 +9,54 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS customizado
+# --- CSS customizado para UX moderna ---
 st.markdown("""
 <style>
 .time-display {
     font-size: 5rem;
     font-weight: bold;
     text-align: center;
-    margin: 1rem 0;
-    color: #2c3e50;
+    margin: 1.5rem 0 0.5rem 0;
+    color: #e74c3c;
     font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
 }
 .status-text {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     text-align: center;
-    margin: 1rem 0;
+    margin: 0.5rem 0 1rem 0;
     font-weight: 600;
+    color: #34495e;
 }
 .pomodoro-count {
     text-align: center;
-    margin: 1rem 0;
+    margin: 0.5rem 0 1.5rem 0;
     font-size: 1rem;
     color: #7f8c8d;
 }
 .stButton>button {
     border: none;
     border-radius: 8px;
-    padding: 0.5rem 1rem;
+    padding: 0.7rem 1.5rem;
     font-weight: 600;
-    transition: all 0.3s ease;
-    margin: 5px 0;
+    font-size: 1.1rem;
+    background: #e74c3c;
+    color: #fff;
+    margin: 0.3rem 0.5rem;
+    transition: background 0.2s;
+}
+.stButton>button:hover {
+    background: #c0392b;
 }
 .video-container {
     position: relative;
     width: 100%;
     height: 0;
-    padding-bottom: 56.25%; /* Proporção 16:9 */
+    padding-bottom: 56.25%; /* 16:9 */
     margin-top: 20px;
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
 }
 .video-container iframe {
     position: absolute;
@@ -69,19 +77,15 @@ st.markdown("""
     flex: 1;
     min-width: 120px;
 }
-.ready-display {
-    color: #95a5a6;
-}
-.working-display {
-    color: #e74c3c;
-}
-.break-display {
-    color: #2ecc71;
+@media (max-width: 600px) {
+    .time-display { font-size: 2.5rem; }
+    .status-text { font-size: 1rem; }
+    .video-container { padding-bottom: 40%; }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Estados da sessão
+# --- Estados da sessão ---
 if 'pomodoro_count' not in st.session_state:
     st.session_state.pomodoro_count = 0
 if 'current_state' not in st.session_state:
@@ -92,19 +96,22 @@ if 'paused' not in st.session_state:
     st.session_state.paused = False
 if 'remaining' not in st.session_state:
     st.session_state.remaining = None
+if 'mode' not in st.session_state:
+    st.session_state.mode = "Pomodoro"  # ou "Custom"
+if 'running' not in st.session_state:
+    st.session_state.running = False
 
-# Configurações padrão
+# --- Configurações padrão ---
 DEFAULT_WORK = 25
 DEFAULT_SHORT_BREAK = 5
 DEFAULT_LONG_BREAK = 15
 
-# Configurações do usuário
+# --- Configurações do usuário ---
 with st.sidebar:
     st.title("⚙️ Configurações")
-    work_time = st.number_input("Tempo de trabalho (minutos)", min_value=1, max_value=60, value=DEFAULT_WORK)
-    short_break = st.number_input("Pausa curta (minutos)", min_value=1, max_value=30, value=DEFAULT_SHORT_BREAK)
-    long_break = st.number_input("Pausa longa (minutos)", min_value=1, max_value=60, value=DEFAULT_LONG_BREAK)
-    pomodoros_before_long = st.number_input("Pomodoros antes da pausa longa", min_value=1, max_value=10, value=4)
+    work_time = st.number_input("Tempo de trabalho (min)", min_value=1, max_value=60, value=25)
+    short_break = st.number_input("Pausa curta (min)", min_value=1, max_value=30, value=5)
+    long_break = st.number_input("Pausa longa (min)", min_value=1, max_value=60, value=15)
     st.markdown("---")
     st.markdown("### Sobre a Técnica Pomodoro")
     st.markdown("""
@@ -117,11 +124,25 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("Desenvolvido com ❤️ usando Python e Streamlit")
 
-# Funções do timer
+# --- Ajuste os tempos do timer conforme configuração ---
+if 'current_state' in st.session_state:
+    if st.session_state.current_state == "working":
+        tempo = work_time
+    elif st.session_state.current_state == "short_break":
+        tempo = short_break
+    elif st.session_state.current_state == "long_break":
+        tempo = long_break
+    else:
+        tempo = work_time
+else:
+    tempo = work_time
+
+# --- Funções do timer ---
 def start_timer(minutes):
     st.session_state.end_time = time.time() + minutes * 60
     st.session_state.paused = False
     st.session_state.remaining = None
+    st.session_state.running = True
 
 def pause_timer():
     if st.session_state.end_time and not st.session_state.paused:
@@ -139,8 +160,8 @@ def reset_timer():
     st.session_state.paused = False
     st.session_state.remaining = None
     st.session_state.current_state = "ready"
+    st.session_state.running = False
 
-# Função corrigida para formatação do tempo
 def format_time(seconds):
     if seconds <= 0:
         return "00:00"
@@ -169,27 +190,28 @@ def handle_timer_end():
         st.session_state.current_state = "working"
         start_timer(work_time)
 
-# Interface principal
+# --- Interface principal ---
 st.title("🍅 FocusFlow Pomodoro Timer")
 st.markdown("### A técnica definitiva para melhorar sua produtividade")
 
-# Display do timer
+# --- Display do timer ---
 remaining_seconds = get_remaining_time()
 time_display = st.empty()
 
-# Determinar classe CSS com base no estado
-time_class = "ready-display"
+time_class = ""
 if st.session_state.current_state == "working":
-    time_class = "working-display"
+    time_class = "time-display working-display"
 elif st.session_state.current_state in ["short_break", "long_break"]:
-    time_class = "break-display"
+    time_class = "time-display break-display"
+else:
+    time_class = "time-display ready-display"
 
 if remaining_seconds > 0:
-    time_display.markdown(f"<div class='time-display {time_class}'>{format_time(remaining_seconds)}</div>", unsafe_allow_html=True)
+    time_display.markdown(f"<div class='{time_class}'>{format_time(remaining_seconds)}</div>", unsafe_allow_html=True)
 else:
     time_display.markdown(f"<div class='time-display ready-display'>00:00</div>", unsafe_allow_html=True)
 
-# Status atual
+# --- Status atual ---
 status_text = {
     "ready": "Pronto para começar",
     "working": "⏳ Trabalho Focado",
@@ -200,50 +222,55 @@ status_text = {
 st.markdown(f"<div class='status-text'>{status_text}</div>", unsafe_allow_html=True)
 st.markdown(f"<div class='pomodoro-count'>Pomodoros completos: {st.session_state.pomodoro_count}</div>", unsafe_allow_html=True)
 
-# Controles
+# --- Controles ---
 st.markdown('<div class="controls-container">', unsafe_allow_html=True)
 
-if st.session_state.current_state == "ready":
-    if st.button("▶️ Começar Pomodoro", use_container_width=True, key="start"):
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("▶️ Pomodoro", use_container_width=True, key="start_pomodoro"):
         st.session_state.current_state = "working"
         start_timer(work_time)
         st.rerun()
-elif st.session_state.current_state == "working":
-    if not st.session_state.paused:
-        if st.button("⏸️ Pausar", use_container_width=True, key="pause", help="Pausar o timer"):
-            pause_timer()
-            st.rerun()
-    else:
-        if st.button("▶️ Continuar", use_container_width=True, key="resume", help="Continuar o timer"):
-            resume_timer()
-            st.rerun()
-
-if st.session_state.current_state != "ready":
-    if st.button("⏭️ Pular", use_container_width=True, key="skip", help="Pular para o próximo estágio"):
-        handle_timer_end()
+with col2:
+    if st.button("☕ Pausa Curta", use_container_width=True, key="start_short_break"):
+        st.session_state.current_state = "short_break"
+        start_timer(short_break)
         st.rerun()
-    if st.button("🔄 Reiniciar", use_container_width=True, key="reset", help="Reiniciar o timer"):
-        reset_timer()
+with col3:
+    if st.button("🌴 Pausa Longa", use_container_width=True, key="start_long_break"):
+        st.session_state.current_state = "long_break"
+        start_timer(long_break)
         st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Vídeo de fundo durante o trabalho
-if st.session_state.current_state == "working" and remaining_seconds > 0:
+# --- Botões de Pausar/Continuar ---
+if st.session_state.current_state in ["working", "short_break", "long_break"]:
+    if not st.session_state.paused:
+        if st.button("⏸️ Pausar Timer", use_container_width=True, key="pause_timer"):
+            pause_timer()
+            st.rerun()
+    else:
+        if st.button("▶️ Continuar Timer", use_container_width=True, key="resume_timer"):
+            resume_timer()
+            st.rerun()
+
+# --- Vídeo de fundo durante o trabalho ---
+if st.session_state.mode == "Pomodoro" and st.session_state.running:
     st.markdown("---")
     st.markdown("### Ambiente de Foco")
     st.markdown("""
-    <div class="video-container">
-        <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen>
-        </iframe>
-    </div>
+        <div class="video-container">
+            <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=0&controls=0&loop=1&playlist=jfKfPfyJRdk"
+                    frameborder="0"
+                    allow="autoplay; encrypted-media"
+                    allowfullscreen>
+            </iframe>
+        </div>
     """, unsafe_allow_html=True)
     st.caption("Música relaxante para ajudar na concentração")
 
-# Atualização automática
+# --- Atualização automática do timer ---
 if remaining_seconds > 0:
     time.sleep(1)
     st.rerun()
