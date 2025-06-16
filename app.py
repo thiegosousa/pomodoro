@@ -1,8 +1,6 @@
 import streamlit as st
-from streamlit_player import st_player
 import time
-from datetime import datetime, timedelta
-import threading
+from datetime import timedelta
 
 # Configuração da página
 st.set_page_config(
@@ -13,37 +11,37 @@ st.set_page_config(
 )
 
 # CSS customizado
-def local_css(file_name):
-    try:
-        with open(file_name) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except:
-        st.markdown("""
-        <style>
-        .time-display {
-            font-size: 5rem;
-            font-weight: bold;
-            text-align: center;
-            margin: 1rem 0;
-            color: #2c3e50;
-            font-family: 'Courier New', monospace;
-        }
-        .status-text {
-            font-size: 1.5rem;
-            text-align: center;
-            margin: 1rem 0;
-            font-weight: 600;
-        }
-        .pomodoro-count {
-            text-align: center;
-            margin: 1rem 0;
-            font-size: 1rem;
-            color: #7f8c8d;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-local_css("assets/style.css")
+st.markdown("""
+<style>
+.time-display {
+    font-size: 5rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 1rem 0;
+    color: #2c3e50;
+    font-family: 'Courier New', monospace;
+}
+.status-text {
+    font-size: 1.5rem;
+    text-align: center;
+    margin: 1rem 0;
+    font-weight: 600;
+}
+.pomodoro-count {
+    text-align: center;
+    margin: 1rem 0;
+    font-size: 1rem;
+    color: #7f8c8d;
+}
+.stButton>button {
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Estados da sessão
 if 'pomodoro_count' not in st.session_state:
@@ -109,8 +107,7 @@ def reset_timer():
     st.session_state.last_update = time.time()
 
 def format_time(seconds):
-    minutes, secs = divmod(int(seconds), 60)
-    return f"{minutes:02d}:{secs:02d}"
+    return str(timedelta(seconds=int(seconds))[2:7]  # Formato MM:SS
 
 def get_remaining_time():
     if st.session_state.paused and st.session_state.remaining:
@@ -168,31 +165,36 @@ with col2:
             if st.button("Começar Pomodoro", use_container_width=True, key="start"):
                 st.session_state.current_state = "working"
                 start_timer(work_time)
+                st.rerun()
         elif st.session_state.current_state == "working":
             if st.button("Pausar", use_container_width=True, disabled=st.session_state.paused, key="pause"):
                 pause_timer()
+                st.rerun()
             if st.button("Continuar", use_container_width=True, disabled=not st.session_state.paused, key="resume"):
                 resume_timer()
+                st.rerun()
     
     with col_controls2:
         if st.session_state.current_state != "ready":
             if st.button("Pular", use_container_width=True, key="skip"):
                 handle_timer_end()
+                st.rerun()
     
     with col_controls3:
         if st.session_state.current_state != "ready":
             if st.button("Reiniciar", use_container_width=True, key="reset"):
                 reset_timer()
+                st.rerun()
 
-# Vídeo de fundo durante o trabalho
+# Vídeo de fundo durante o trabalho (opcional)
 if st.session_state.current_state == "working" and remaining_seconds > 0:
     st.markdown("---")
     st.markdown("### Ambiente de Foco")
-    st_player("https://www.youtube.com/watch?v=jfKfPfyJRdk", height=300)
+    st.video("https://www.youtube.com/watch?v=jfKfPfyJRdk")
 
 # Atualização automática
-if remaining_seconds > 0 or st.session_state.current_state != "ready":
-    time.sleep(0.1)
+if remaining_seconds > 0 and time.time() - st.session_state.last_update > 0.1:
+    st.session_state.last_update = time.time()
     st.rerun()
 elif st.session_state.end_time is not None and remaining_seconds <= 0:
     handle_timer_end()
